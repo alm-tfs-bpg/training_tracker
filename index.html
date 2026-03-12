@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Curriculum Browser</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; }
+    input { padding: 8px; width: min(720px, 100%); }
+    .node { margin: 8px 0; }
+    .indent { margin-left: 20px; }
+    code { background: #f3f3f3; padding: 2px 4px; border-radius: 4px; }
+    summary { cursor: pointer; }
+    .itemline { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h1>Curriculum Browser</h1>
+
+  <input id="search" placeholder="Search curriculum/sub/item IDs or titles..." />
+
+  <div id="app"></div>
+
+  <script>
+    const app = document.getElementById('app');
+    const search = document.getElementById('search');
+    let data = [];
+
+    function textOfCurr(c) {
+      return `${c.id} ${c.title || ""}`.toLowerCase();
+    }
+    function textOfSub(s) {
+      return `${s.id} ${s.title || ""}`.toLowerCase();
+    }
+    function textOfItem(it) {
+      return `${it.id} ${it.type || ""} ${it.title || ""}`.toLowerCase();
+    }
+
+    function matches(curr, q) {
+      if (!q) return true;
+      q = q.toLowerCase();
+      if (textOfCurr(curr).includes(q)) return true;
+
+      for (const sub of (curr.subcurriculums || [])) {
+        if (textOfSub(sub).includes(q)) return true;
+        for (const it of (sub.items || [])) {
+          if (textOfItem(it).includes(q)) return true;
+        }
+      }
+      for (const it of (curr.standalone_items || [])) {
+        if (textOfItem(it).includes(q)) return true;
+      }
+      return false;
+    }
+
+    function render(q="") {
+      app.innerHTML = "";
+      const filtered = data.filter(c => matches(c, q));
+
+      if (filtered.length === 0) {
+        app.textContent = "No matches.";
+        return;
+      }
+
+      for (const curr of filtered) {
+        const currDetails = document.createElement('details');
+        currDetails.className = "node";
+        const currSummary = document.createElement('summary');
+        currSummary.innerHTML = `<code>${curr.id}</code>${curr.title ? " - " + curr.title : ""}`;
+        currDetails.appendChild(currSummary);
+
+        // Subcurriculums
+        if (curr.subcurriculums && curr.subcurriculums.length) {
+          const subWrap = document.createElement('div');
+          subWrap.className = "indent";
+
+          const subHeader = document.createElement('div');
+          subHeader.style.marginTop = "8px";
+          subHeader.innerHTML = `<strong>Sub-Curriculums</strong>`;
+          subWrap.appendChild(subHeader);
+
+          for (const sub of curr.subcurriculums) {
+            const subDetails = document.createElement('details');
+            subDetails.className = "node";
+
+            const subSummary = document.createElement('summary');
+            subSummary.innerHTML = `<code>${sub.id}</code>${sub.title ? " - " + sub.title : ""}`;
+            subDetails.appendChild(subSummary);
+
+            const itemsDiv = document.createElement('div');
+            itemsDiv.className = "indent";
+
+            for (const it of (sub.items || [])) {
+              const line = document.createElement('div');
+              line.className = "itemline";
+              line.innerHTML = `<code>${it.id}</code>${it.type ? " - " + it.type : ""}${it.title ? " - " + it.title : ""}`;
+              itemsDiv.appendChild(line);
+            }
+
+            subDetails.appendChild(itemsDiv);
+            subWrap.appendChild(subDetails);
+          }
+
+          currDetails.appendChild(subWrap);
+        }
+
+        // Standalone items
+        if (curr.standalone_items && curr.standalone_items.length) {
+          const standWrap = document.createElement('div');
+          standWrap.className = "indent";
+          standWrap.style.marginTop = "8px";
+          standWrap.innerHTML = `<strong>Standalone items</strong>`;
+
+          const itemsDiv = document.createElement('div');
+          itemsDiv.className = "indent";
+
+          for (const it of curr.standalone_items) {
+            const line = document.createElement('div');
+            line.className = "itemline";
+            line.innerHTML = `<code>${it.id}</code>${it.type ? " - " + it.type : ""}${it.title ? " - " + it.title : ""}`;
+            itemsDiv.appendChild(line);
+          }
+
+          standWrap.appendChild(itemsDiv);
+          currDetails.appendChild(standWrap);
+        }
+
+        app.appendChild(currDetails);
+      }
+    }
+
+    fetch('./report.json')
+      .then(r => r.json())
+      .then(j => { data = j; render(""); });
+
+    search.addEventListener('input', e => render(e.target.value));
+  </script>
+</body>
+</html>
